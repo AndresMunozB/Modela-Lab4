@@ -1,14 +1,14 @@
 Flock flock;
 
 void setup() {
-  size(640, 360);
+  size(1024, 720);
   flock = new Flock();
   // Add an initial set of boids into the system
   for (int i = 0; i < 150; i++) {
     flock.addBoid(new Boid(width/2,height/2));
   }
-  flock.leader = new Leader(0,180);
-  flock.disruptor = new Disruptor(0,90);
+  flock.leader = new Leader(0,height/2);
+  flock.disruptor = new Disruptor(width/2,0);
 }
 
 void draw() {
@@ -40,8 +40,8 @@ class Flock {
     for (Boid b : boids) {
       b.run(boids, leader, disruptor);  // 
     }
-    leader.run(boids);
-    disruptor.run(boids);
+    leader.run();
+    disruptor.run();
   }
 
   void addBoid(Boid b) {
@@ -121,14 +121,6 @@ class Boid extends Bird{
     borders();
     render();
   }
-  
-  PVector towardsLeader(Leader leader){
-   return new PVector(3,3); 
-  }
-  
-  PVector getAwayDisruptor(Disruptor disruptor){
-    return new PVector(-3,-3);
-  }
 
   void applyForce(PVector force) {
     // We could add mass here if we want A = F / M
@@ -147,8 +139,8 @@ class Boid extends Bird{
     sep.mult(1.5);
     ali.mult(1.0);
     coh.mult(1.0);
-    towards.mult(1.5);
-    getAway.mult(1.5);
+    towards.mult(1.0);
+    getAway.mult(1.0);
     // Add the force vectors to acceleration
     applyForce(sep);
     applyForce(ali);
@@ -278,20 +270,38 @@ class Boid extends Bird{
     }
   }
   
+  PVector towardsLeader(Leader leader){
+    float d = PVector.dist(position, leader.position);
+    
+    PVector towards = seek(leader.position);
+    towards = towards.mult(50/d);
+    //System.out.println(towards);
+    return towards;
+  }
+  
+  PVector getAwayDisruptor(Disruptor disruptor){
+    float d = PVector.dist(position, disruptor.position);
+    
+    PVector towards = seek(disruptor.position);
+    towards = towards.mult(-50/d);
+    //System.out.println(towards);
+    return towards;
+  }
+  
 }
 
 // Leader Class
 class Leader extends Bird{  
   Leader(float x, float y) { //Constructor
     super(x,y);
-    velocity.x = -1;
-    velocity.y = way(velocity.x);
+    velocity.x = -2;
+    velocity.y = 0;
     velocity.limit(maxspeed);
     r = 5.0; //Tamaño del pajaro 
     colour = new Colour(38, 132, 232);
   }
   
-  void run(ArrayList<Boid> boids) {
+  void run() {
     update();
     borders();
     render();
@@ -312,14 +322,15 @@ class Leader extends Bird{
 class Disruptor extends Bird{
   Disruptor(float x, float y) { //Constructor
     super(x,y);
-    velocity.x = 1;
-    velocity.y = way(velocity.x);
+    velocity.x = 0;
+    velocity.y = 2;
     velocity.limit(maxspeed);
+    System.out.println(velocity);
     r = 5.0; //Tamaño del pajaro
     colour = new Colour(235, 66, 36);
   }
   
-  void run(ArrayList<Boid> boids) {
+  void run() {
     update();
     borders();
     render();
