@@ -7,7 +7,8 @@ void setup() {
   for (int i = 0; i < 150; i++) {
     flock.addBoid(new Boid(width/2,height/2));
   }
-  flock.addBoid(new Leader(0,180));
+  flock.leader = new Leader(0,180);
+  flock.disruptor = new Disruptor(0,90);
 }
 
 void draw() {
@@ -28,6 +29,8 @@ void mousePressed() {
 
 class Flock {
   ArrayList<Boid> boids; // An ArrayList for all the boids
+  Leader leader;
+  Disruptor disruptor;
 
   Flock() {
     boids = new ArrayList<Boid>(); // Initialize the ArrayList
@@ -35,8 +38,10 @@ class Flock {
 
   void run() {
     for (Boid b : boids) {
-      b.run(boids);  // 
+      b.run(boids, leader, disruptor);  // 
     }
+    leader.run(boids);
+    disruptor.run(boids);
   }
 
   void addBoid(Boid b) {
@@ -45,21 +50,40 @@ class Flock {
 
 }
 
-// Leader Class
-
-class Leader extends Boid{  
-  Leader(float x, float y) { //Constructor
-    super(x,y);
-    r = 5.0; //Tamaño del pajaro 
+public class Colour{
+  int r;
+  int g;
+  int b;
+  Colour(int r, int g, int b){
+    this.r = r;
+    this.g = g;
+    this.b = b;
+  }
+}
+public class Bird{
+  PVector position;
+  PVector velocity;
+  PVector acceleration;
+  float r;
+  float maxforce;    // Maximum steering force
+  float maxspeed;    // Maximum speed
+  Colour colour;
+  
+  
+  Bird(float x, float y){
+    position = new PVector(x, y);
+    velocity = new PVector(0,0);
+    acceleration = new PVector(0, 0);
+    maxspeed = 2;
+    maxforce = 0.03;
   }
   
   void render() {
     // Draw a triangle rotated in the direction of velocity
     float theta = velocity.heading2D() + radians(90);
     // heading2D() above is now heading() but leaving old syntax until Processing.js catches up
-    
-    fill(204, 102, 0); //Color de llenado del triangulo
-    stroke(204, 102, 0); //Color del borde del triangulo
+    fill(colour.r,colour.g,colour.b); //Color de llenado del triangulo
+    stroke(colour.r,colour.g,colour.b); //Color del borde del triangulo
     pushMatrix();
     translate(position.x, position.y);
     rotate(theta);
@@ -71,62 +95,39 @@ class Leader extends Boid{
     popMatrix();
   }
   
-  void run(ArrayList<Boid> boids) {
-    update();
-    borders();
-    render();
-  }
-  
-  // Method to update position
-  void update() {
-    // Update velocity
-    velocity.x -= 1;
-    velocity.y = way(velocity.x);
-    // Limit speed
-    velocity.limit(maxspeed);
-    position.add(velocity);
-    // Reset accelertion to 0 each cycle
-    acceleration.mult(0);
-  }
-  
-  float way(float x){
-    return x;
-  }
+  // Wraparound
+  void borders() {
+    if (position.x < -r) position.x = width+r;
+    if (position.y < -r) position.y = height+r;
+    if (position.x > width+r) position.x = -r;
+    if (position.y > height+r) position.y = -r;
+  } 
 }
 
-
 // The Boid class
-
-class Boid {
-
-  PVector position;
-  PVector velocity;
-  PVector acceleration;
-  float r;
-  float maxforce;    // Maximum steering force
-  float maxspeed;    // Maximum speed
+class Boid extends Bird{
 
   Boid(float x, float y) {
-    acceleration = new PVector(0, 0);
-
-    // This is a new PVector method not yet implemented in JS
-    // velocity = PVector.random2D();
-
-    // Leaving the code temporarily this way so that this example runs in JS
+    super(x,y);
     float angle = random(TWO_PI);
     velocity = new PVector(cos(angle), sin(angle));
-
-    position = new PVector(x, y);
-    r = 2.0; //Tamaño del pajaro 
-    maxspeed = 2;
-    maxforce = 0.03;
+    r = 2.0; //Tamaño del pajaro
+    colour = new Colour(255,255,255);
   }
 
-  void run(ArrayList<Boid> boids) {
-    flock(boids);
+  void run(ArrayList<Boid> boids, Leader leader, Disruptor disruptor) {
+    flock(boids, leader, disruptor);
     update();
     borders();
     render();
+  }
+  
+  PVector towardsLeader(Leader leader){
+   return new PVector(3,3); 
+  }
+  
+  PVector getAwayDisruptor(Disruptor disruptor){
+    return new PVector(-3,-3);
   }
 
   void applyForce(PVector force) {
@@ -135,19 +136,25 @@ class Boid {
   }
 
   // We accumulate a new acceleration each time based on three rules
-  void flock(ArrayList<Boid> boids) {
+  void flock(ArrayList<Boid> boids, Leader leader, Disruptor disruptor) {
     PVector sep = separate(boids);   // Separation
     PVector ali = align(boids);      // Alignment
     PVector coh = cohesion(boids);   // Cohesion
+    PVector towards = towardsLeader(leader); // acercarse al lider
+    PVector getAway = getAwayDisruptor(disruptor); // alejarse del disruptor
+    
     // Arbitrarily weight these forces p
     sep.mult(1.5);
     ali.mult(1.0);
     coh.mult(1.0);
+    towards.mult(1.5);
+    getAway.mult(1.5);
     // Add the force vectors to acceleration
     applyForce(sep);
     applyForce(ali);
     applyForce(coh);
-    
+    applyForce(towards);
+    applyForce(getAway);
   }
 
   // Method to update position
@@ -178,33 +185,7 @@ class Boid {
     steer.limit(maxforce);  // Limit to maximum steering force
     return steer;
   }
-
-  void render() {
-    // Draw a triangle rotated in the direction of velocity
-    float theta = velocity.heading2D() + radians(90);
-    // heading2D() above is now heading() but leaving old syntax until Processing.js catches up
-    
-    fill(200, 100); //Color de llenado del triangulo
-    stroke(255); //Color del borde del triangulo
-    pushMatrix();
-    translate(position.x, position.y);
-    rotate(theta);
-    beginShape(TRIANGLES);
-    vertex(0, -r*2); //Vertices del pajaro (triangulo)
-    vertex(-r, r*2);
-    vertex(r, r*2);
-    endShape();
-    popMatrix();
-  }
-
-  // Wraparound
-  void borders() {
-    if (position.x < -r) position.x = width+r;
-    if (position.y < -r) position.y = height+r;
-    if (position.x > width+r) position.x = -r;
-    if (position.y > height+r) position.y = -r;
-  }
-
+  
   // Separation
   // Method checks for nearby boids and steers away
   PVector separate (ArrayList<Boid> boids) {
@@ -295,5 +276,63 @@ class Boid {
     else {
       return new PVector(0, 0);
     }
+  }
+  
+}
+
+// Leader Class
+class Leader extends Bird{  
+  Leader(float x, float y) { //Constructor
+    super(x,y);
+    velocity.x = -1;
+    velocity.y = way(velocity.x);
+    velocity.limit(maxspeed);
+    r = 5.0; //Tamaño del pajaro 
+    colour = new Colour(38, 132, 232);
+  }
+  
+  void run(ArrayList<Boid> boids) {
+    update();
+    borders();
+    render();
+  }
+  
+  // Method to update position
+  void update() {
+    position.add(velocity);
+    // Reset accelertion to 0 each cycle
+    acceleration.mult(0);
+  }
+  
+  float way(float x){
+    return x;
+  }
+}
+
+class Disruptor extends Bird{
+  Disruptor(float x, float y) { //Constructor
+    super(x,y);
+    velocity.x = 1;
+    velocity.y = way(velocity.x);
+    velocity.limit(maxspeed);
+    r = 5.0; //Tamaño del pajaro
+    colour = new Colour(235, 66, 36);
+  }
+  
+  void run(ArrayList<Boid> boids) {
+    update();
+    borders();
+    render();
+  }
+  
+  // Method to update position
+  void update() {
+    position.add(velocity);
+    // Reset accelertion to 0 each cycle
+    acceleration.mult(0);
+  }
+  
+  float way(float x){
+    return x;
   }
 }
