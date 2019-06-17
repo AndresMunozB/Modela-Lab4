@@ -138,7 +138,7 @@ class Boid extends Bird{
     PVector sepDisruptor = separateDisruptor(disruptor); // alejarse del disruptor
     
     // Arbitrarily weight these forces p
-    sep.mult(2.0);
+    sep.mult(2.25);
     ali.mult(1.5);
     coh.mult(1.5);
     sepLeader.mult(2.0);
