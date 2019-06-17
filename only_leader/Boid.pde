@@ -1,109 +1,3 @@
-Flock flock;
-
-void setup() {
-  size(1024, 720);
-  flock = new Flock();
-  // Add an initial set of boids into the system
-  for (int i = 0; i < 150; i++) {
-    flock.addBoid(new Boid(width/2,height/2));
-  }
-  flock.leader = new Leader(0,height/2);
-  flock.disruptor = new Disruptor(width/2,height/5);
-}
-
-void draw() {
-  background(1);
-  flock.run();
-}
-
-// Add a new boid into the System
-void mousePressed() {
-  flock.addBoid(new Boid(mouseX,mouseY));
-  System.out.print(mouseX + ",");
-  System.out.print(mouseY + " - ");
-}
-
-
-
-// The Flock (a list of Boid objects)
-
-class Flock {
-  ArrayList<Boid> boids; // An ArrayList for all the boids
-  Leader leader;
-  Disruptor disruptor;
-
-  Flock() {
-    boids = new ArrayList<Boid>(); // Initialize the ArrayList
-  }
-
-  void run() {
-    for (Boid b : boids) {
-      b.run(boids, leader, disruptor);  // 
-    }
-    leader.run();
-    disruptor.run();
-  }
-
-  void addBoid(Boid b) {
-    boids.add(b);
-  }
-
-}
-
-public class Colour{
-  int r;
-  int g;
-  int b;
-  Colour(int r, int g, int b){
-    this.r = r;
-    this.g = g;
-    this.b = b;
-  }
-}
-public class Bird{
-  PVector position;
-  PVector velocity;
-  PVector acceleration;
-  float r;
-  float maxforce;    // Maximum steering force
-  float maxspeed;    // Maximum speed
-  Colour colour;
-  
-  
-  Bird(float x, float y){
-    position = new PVector(x, y);
-    velocity = new PVector(0,0);
-    acceleration = new PVector(0, 0);
-    maxspeed = 1.8;
-    maxforce = 0.03;
-  }
-  
-  void render() {
-    // Draw a triangle rotated in the direction of velocity
-    float theta = velocity.heading2D() + radians(90);
-    // heading2D() above is now heading() but leaving old syntax until Processing.js catches up
-    fill(colour.r,colour.g,colour.b); //Color de llenado del triangulo
-    stroke(colour.r,colour.g,colour.b); //Color del borde del triangulo
-    pushMatrix();
-    translate(position.x, position.y);
-    rotate(theta);
-    beginShape(TRIANGLES);
-    vertex(0, -r*2); //Vertices del pajaro (triangulo)
-    vertex(-r, r*2);
-    vertex(r, r*2);
-    endShape();
-    popMatrix();
-  }
-  
-  // Wraparound
-  void borders() {
-    if (position.x < -r) position.x = width+r;
-    if (position.y < -r) position.y = height+r;
-    if (position.x > width+r) position.x = -r;
-    if (position.y > height+r) position.y = -r;
-  } 
-}
-
 // The Boid class
 class Boid extends Bird{
 
@@ -115,8 +9,8 @@ class Boid extends Bird{
     colour = new Colour(255,255,255);
   }
 
-  void run(ArrayList<Boid> boids, Leader leader, Disruptor disruptor) {
-    flock(boids, leader, disruptor);
+  void run(ArrayList<Boid> boids, Leader leader) {
+    flock(boids, leader);
     update();
     borders();
     render();
@@ -128,14 +22,13 @@ class Boid extends Bird{
   }
 
   // We accumulate a new acceleration each time based on three rules
-  void flock(ArrayList<Boid> boids, Leader leader, Disruptor disruptor) {
+  void flock(ArrayList<Boid> boids, Leader leader) {
     PVector sep = separate(boids);   // Separation
     PVector ali = align(boids);      // Alignment
     PVector coh = cohesion(boids);   // Cohesion
     PVector sepLeader = separateLeader(leader); // acercarse al lider
     PVector aliLeader = alignLeader(leader); // acercarse al lider
     PVector cohLeader = cohesionLeader(leader); // acercarse al lider
-    PVector sepDisruptor = separateDisruptor(disruptor); // alejarse del disruptor
     
     // Arbitrarily weight these forces p
     sep.mult(2.25);
@@ -144,7 +37,6 @@ class Boid extends Bird{
     sepLeader.mult(2.0);
     aliLeader.mult(1);
     cohLeader.mult(1.2);
-    sepDisruptor.mult(2.6);
     // Add the force vectors to acceleration
     applyForce(sep);
     applyForce(ali);
@@ -152,7 +44,6 @@ class Boid extends Bird{
     applyForce(sepLeader);
     applyForce(aliLeader);
     applyForce(cohLeader);
-    applyForce(sepDisruptor);
   }
 
   // Method to update position
@@ -368,127 +259,5 @@ class Boid extends Bird{
     else {
       return new PVector(0, 0);
     }
-  }
-  
-  // Separation
-  // Method checks for nearby boids and steers away
-  PVector separateDisruptor (Disruptor disruptor) {
-    float desiredseparation = 150.0f;
-    PVector steer = new PVector(0, 0, 0);
-    int count = 0;
-    // For every boid in the system, check if it's too close
-    
-    float d = PVector.dist(position, disruptor.position);
-    // If the distance is greater than 0 and less than an arbitrary amount (0 when you are yourself)
-    if ((d > 0) && (d < desiredseparation)) {
-      // Calculate vector pointing away from neighbor
-      PVector diff = PVector.sub(position, disruptor.position);
-      diff.normalize();
-      diff.div(d);        // Weight by distance
-      steer.add(diff);
-      count++;            // Keep track of how many
-    }
-    
-    // Average -- divide by how many+++
-    if (count > 0) {
-      steer.div((float)count);
-    }
-
-    // As long as the vector is greater than 0
-    if (steer.mag() > 0) {
-      // First two lines of code below could be condensed with new PVector setMag() method
-      // Not using this method until Processing.js catches up
-      // steer.setMag(maxspeed);
-
-      // Implement Reynolds: Steering = Desired - Velocity
-      steer.normalize();
-      steer.mult(maxspeed);
-      steer.sub(velocity);
-      steer.limit(maxforce);
-    }
-    return steer;
-  }
-  
-}
-
-// Leader Class
-class Leader extends Bird{  
-  float angle = 0;
-  boolean flag = true;
-  Leader(float x, float y) { //Constructor
-    super(x,y);
-    velocity.x = -2;
-    velocity.y = 0;
-    velocity.limit(maxspeed);
-    r = 5.0; //Tamaño del pajaro 
-    colour = new Colour(38, 132, 232);
-  }
-  
-  void run() {
-    update();
-    borders();
-    render();
-  }
-  
-  // Method to update position
-  void update() {
-    changeVelocity();
-    velocity.add(acceleration);
-    velocity.limit(maxspeed);
-    position.add(velocity);
-    acceleration.mult(0);
-  }
-  
-  void changeVelocity(){
-    if(flag){
-      angle += PI/720;
-    }
-    else{
-      angle -= PI/720;
-    }
-    if(angle > PI/3){
-      flag = false;
-    }
-    else if(angle < -PI/4){
-      flag = true;
-    }
-    velocity.x = 1.8*cos(angle);
-    velocity.y = 1.8*sin(angle);
-  }
-  
-}
-
-class Disruptor extends Bird{
-  float angle;
-  Disruptor(float x, float y) { //Constructor
-    super(x,y);
-    velocity.x = 2;
-    velocity.y = 0;
-    velocity.limit(maxspeed);
-    r = 5.0; //Tamaño del pajaro
-    colour = new Colour(235, 66, 36);
-  }
-  
-  void run() {
-    update();
-    borders();
-    render();
-  }
-  
-  void update() {
-    //changeVelocity();
-    changeAcceleration();
-    velocity.add(acceleration);
-    velocity.limit(maxspeed);
-    position.add(velocity);
-    acceleration.mult(0);
-  }
-  void changeAcceleration(){
-    PVector centro = new PVector(width/2,height/2);
-    PVector radio = PVector.sub(centro, position);
-    float r = radio.mag();
-    float v = velocity.mag();
-    radio.normalize();
-    acceleration = radio.mult((v*v)/r);
-  }
+  }  
 }
