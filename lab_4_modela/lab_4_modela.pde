@@ -74,7 +74,7 @@ public class Bird{
     position = new PVector(x, y);
     velocity = new PVector(0,0);
     acceleration = new PVector(0, 0);
-    maxspeed = 2;
+    maxspeed = 1.8;
     maxforce = 0.03;
   }
   
@@ -132,20 +132,26 @@ class Boid extends Bird{
     PVector sep = separate(boids);   // Separation
     PVector ali = align(boids);      // Alignment
     PVector coh = cohesion(boids);   // Cohesion
-    PVector towards = towardsLeader(leader); // acercarse al lider
+    PVector sepLeader = separateLeader(leader); // acercarse al lider
+    PVector aliLeader = alignLeader(leader); // acercarse al lider
+    PVector cohLeader = cohesionLeader(leader); // acercarse al lider
     PVector getAway = getAwayDisruptor(disruptor); // alejarse del disruptor
     
     // Arbitrarily weight these forces p
-    sep.mult(1.5);
-    ali.mult(1.0);
-    coh.mult(1.0);
-    towards.mult(1.0);
-    getAway.mult(1.0);
+    sep.mult(2.0);
+    ali.mult(1);
+    coh.mult(1);
+    sepLeader.mult(1.2);
+    aliLeader.mult(1.2);
+    cohLeader.mult(2.0);
+    getAway.mult(2.0);
     // Add the force vectors to acceleration
     applyForce(sep);
     applyForce(ali);
     applyForce(coh);
-    applyForce(towards);
+    applyForce(sepLeader);
+    applyForce(aliLeader);
+    applyForce(cohLeader);
     applyForce(getAway);
   }
 
@@ -270,22 +276,116 @@ class Boid extends Bird{
     }
   }
   
-  PVector towardsLeader(Leader leader){
-    float d = PVector.dist(position, leader.position);
+  
+  
+  // Separation
+  // Method checks for nearby boids and steers away
+  PVector separateLeader (Leader leader) {
+    float desiredseparation = 25.0f;
+    PVector steer = new PVector(0, 0, 0);
+    int count = 0;
+    // For every boid in the system, check if it's too close
     
-    PVector towards = seek(leader.position);
-    towards = towards.mult(50/d);
-    //System.out.println(towards);
-    return towards;
+    float d = PVector.dist(position, leader.position);
+    // If the distance is greater than 0 and less than an arbitrary amount (0 when you are yourself)
+    if ((d > 0) && (d < desiredseparation)) {
+      // Calculate vector pointing away from neighbor
+      PVector diff = PVector.sub(position, leader.position);
+      diff.normalize();
+      diff.div(d);        // Weight by distance
+      steer.add(diff);
+      count++;            // Keep track of how many
+    }
+    
+    // Average -- divide by how many+++
+    if (count > 0) {
+      steer.div((float)count);
+    }
+
+    // As long as the vector is greater than 0
+    if (steer.mag() > 0) {
+      // First two lines of code below could be condensed with new PVector setMag() method
+      // Not using this method until Processing.js catches up
+      // steer.setMag(maxspeed);
+
+      // Implement Reynolds: Steering = Desired - Velocity
+      steer.normalize();
+      steer.mult(maxspeed);
+      steer.sub(velocity);
+      steer.limit(maxforce);
+    }
+    return steer;
+  }
+
+  // Alignment
+  // For every nearby boid in the system, calculate the average velocity
+  PVector alignLeader (Leader leader) {
+    //float neighbordist = 50;
+    PVector sum = new PVector(0, 0);
+    int count = 0;
+    
+    float d = PVector.dist(position, leader.position);
+    //if ((d > 0) && (d < neighbordist)) {
+      sum.add(leader.velocity);
+      count++;
+    //}
+    
+    if (count > 0) {
+      sum.div((float)count);
+      // First two lines of code below could be condensed with new PVector setMag() method
+      // Not using this method until Processing.js catches up
+      // sum.setMag(maxspeed);
+
+      // Implement Reynolds: Steering = Desired - Velocity
+      sum.normalize();
+      sum.mult(maxspeed);
+      PVector steer = PVector.sub(sum, velocity);
+      steer.limit(maxforce);
+      return steer;
+    } 
+    else {
+      return new PVector(0, 0);
+    }
+  }
+
+  // Cohesion
+  // For the average position (i.e. center) of all nearby boids, calculate steering vector towards that position
+  PVector cohesionLeader (Leader leader) {
+    //float neighbordist = 50;
+    PVector sum = new PVector(0, 0);   // Start with empty vector to accumulate all positions
+    int count = 0;
+    
+    float d = PVector.dist(position, leader.position);
+    //if ((d > 0) && (d < neighbordist)) {
+      sum.add(leader.position); // Add position
+      count++;
+    //}
+   
+    if (count > 0) {
+      sum.div(count);
+      return seek(sum);  // Steer towards the position
+    } 
+    else {
+      return new PVector(0, 0);
+    }
   }
   
   PVector getAwayDisruptor(Disruptor disruptor){
+    float neighbordist = 250;
+    float a = -50;
     float d = PVector.dist(position, disruptor.position);
+    if ((d > 0) && (d < neighbordist)) {
+        PVector towards = seek(disruptor.position);
+        towards = towards.mult(a/d);
+        //System.out.println(towards);
+        return towards;
+     }
+     else{
+       return new PVector(0,0);
+     }
+     
+     
     
-    PVector towards = seek(disruptor.position);
-    towards = towards.mult(-50/d);
-    //System.out.println(towards);
-    return towards;
   }
   
 }
@@ -331,8 +431,8 @@ class Leader extends Bird{
     else if(angle < -PI/4){
       flag = true;
     }
-    velocity.x = 2*cos(angle);
-    velocity.y = 2*sin(angle);
+    velocity.x = 1.8*cos(angle);
+    velocity.y = 1.8*sin(angle);
   }
   
 }
