@@ -292,6 +292,8 @@ class Boid extends Bird{
 
 // Leader Class
 class Leader extends Bird{  
+  float angle = 0;
+  boolean flag = true;
   Leader(float x, float y) { //Constructor
     super(x,y);
     velocity.x = -2;
@@ -309,23 +311,39 @@ class Leader extends Bird{
   
   // Method to update position
   void update() {
+    changeVelocity();
+    velocity.add(acceleration);
+    velocity.limit(maxspeed);
     position.add(velocity);
-    // Reset accelertion to 0 each cycle
     acceleration.mult(0);
   }
   
-  float way(float x){
-    return x;
+  void changeVelocity(){
+    if(flag){
+      angle += PI/720;
+    }
+    else{
+      angle -= PI/720;
+    }
+    if(angle > PI/3){
+      flag = false;
+    }
+    else if(angle < -PI/4){
+      flag = true;
+    }
+    velocity.x = 2*cos(angle);
+    velocity.y = 2*sin(angle);
   }
+  
 }
 
 class Disruptor extends Bird{
+  float angle;
   Disruptor(float x, float y) { //Constructor
     super(x,y);
     velocity.x = 0;
     velocity.y = 2;
     velocity.limit(maxspeed);
-    System.out.println(velocity);
     r = 5.0; //Tamaño del pajaro
     colour = new Colour(235, 66, 36);
   }
@@ -336,14 +354,21 @@ class Disruptor extends Bird{
     render();
   }
   
-  // Method to update position
   void update() {
+    changeVelocity();
+    velocity.add(acceleration);
+    velocity.limit(maxspeed);
     position.add(velocity);
-    // Reset accelertion to 0 each cycle
     acceleration.mult(0);
   }
   
-  float way(float x){
-    return x;
+  void changeVelocity(){
+    
+    angle += PI/360;
+    velocity.x = 2*cos(angle);
+    velocity.y = 2*sin(angle);
   }
+  
+  // Method to update position
+  
 }
