@@ -8,7 +8,7 @@ void setup() {
     flock.addBoid(new Boid(width/2,height/2));
   }
   flock.leader = new Leader(0,height/2);
-  flock.disruptor = new Disruptor(width/2,height/4);
+  flock.disruptor = new Disruptor(width/2,height/5);
 }
 
 void draw() {
@@ -462,8 +462,8 @@ class Disruptor extends Bird{
   float angle;
   Disruptor(float x, float y) { //Constructor
     super(x,y);
-    velocity.x = 0;
-    velocity.y = 2;
+    velocity.x = 2;
+    velocity.y = 0;
     velocity.limit(maxspeed);
     r = 5.0; //Tamaño del pajaro
     colour = new Colour(235, 66, 36);
@@ -476,20 +476,19 @@ class Disruptor extends Bird{
   }
   
   void update() {
-    changeVelocity();
+    //changeVelocity();
+    changeAcceleration();
     velocity.add(acceleration);
     velocity.limit(maxspeed);
     position.add(velocity);
     acceleration.mult(0);
   }
-  
-  void changeVelocity(){
-    
-    angle += PI/360;
-    velocity.x = 2*cos(angle);
-    velocity.y = 2*sin(angle);
+  void changeAcceleration(){
+    PVector centro = new PVector(width/2,height/2);
+    PVector radio = PVector.sub(centro, position);
+    float r = radio.mag();
+    float v = velocity.mag();
+    radio.normalize();
+    acceleration = radio.mult((v*v)/r);
   }
-  
-  // Method to update position
-  
 }
