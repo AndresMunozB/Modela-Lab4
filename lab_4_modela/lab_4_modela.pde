@@ -8,7 +8,7 @@ void setup() {
     flock.addBoid(new Boid(width/2,height/2));
   }
   flock.leader = new Leader(0,height/2);
-  flock.disruptor = new Disruptor(width/2,0);
+  flock.disruptor = new Disruptor(width/2,height/4);
 }
 
 void draw() {
@@ -135,16 +135,16 @@ class Boid extends Bird{
     PVector sepLeader = separateLeader(leader); // acercarse al lider
     PVector aliLeader = alignLeader(leader); // acercarse al lider
     PVector cohLeader = cohesionLeader(leader); // acercarse al lider
-    PVector getAway = getAwayDisruptor(disruptor); // alejarse del disruptor
+    PVector sepDisruptor = separateDisruptor(disruptor); // alejarse del disruptor
     
     // Arbitrarily weight these forces p
     sep.mult(2.0);
-    ali.mult(1);
-    coh.mult(1);
-    sepLeader.mult(1.2);
-    aliLeader.mult(1.2);
-    cohLeader.mult(2.0);
-    getAway.mult(2.0);
+    ali.mult(1.5);
+    coh.mult(1.5);
+    sepLeader.mult(2.0);
+    aliLeader.mult(1);
+    cohLeader.mult(1.2);
+    sepDisruptor.mult(2.6);
     // Add the force vectors to acceleration
     applyForce(sep);
     applyForce(ali);
@@ -152,7 +152,7 @@ class Boid extends Bird{
     applyForce(sepLeader);
     applyForce(aliLeader);
     applyForce(cohLeader);
-    applyForce(getAway);
+    applyForce(sepDisruptor);
   }
 
   // Method to update position
@@ -320,15 +320,15 @@ class Boid extends Bird{
   // Alignment
   // For every nearby boid in the system, calculate the average velocity
   PVector alignLeader (Leader leader) {
-    //float neighbordist = 50;
+    float neighbordist = 250;
     PVector sum = new PVector(0, 0);
     int count = 0;
     
     float d = PVector.dist(position, leader.position);
-    //if ((d > 0) && (d < neighbordist)) {
+    if ((d > 0) && (d < neighbordist)) {
       sum.add(leader.velocity);
       count++;
-    //}
+    }
     
     if (count > 0) {
       sum.div((float)count);
@@ -351,15 +351,15 @@ class Boid extends Bird{
   // Cohesion
   // For the average position (i.e. center) of all nearby boids, calculate steering vector towards that position
   PVector cohesionLeader (Leader leader) {
-    //float neighbordist = 50;
+    float neighbordist = 250;
     PVector sum = new PVector(0, 0);   // Start with empty vector to accumulate all positions
     int count = 0;
     
     float d = PVector.dist(position, leader.position);
-    //if ((d > 0) && (d < neighbordist)) {
+    if ((d > 0) && (d < neighbordist)) {
       sum.add(leader.position); // Add position
       count++;
-    //}
+    }
    
     if (count > 0) {
       sum.div(count);
@@ -370,22 +370,43 @@ class Boid extends Bird{
     }
   }
   
-  PVector getAwayDisruptor(Disruptor disruptor){
-    float neighbordist = 250;
-    float a = -50;
-    float d = PVector.dist(position, disruptor.position);
-    if ((d > 0) && (d < neighbordist)) {
-        PVector towards = seek(disruptor.position);
-        towards = towards.mult(a/d);
-        //System.out.println(towards);
-        return towards;
-     }
-     else{
-       return new PVector(0,0);
-     }
-     
-     
+  // Separation
+  // Method checks for nearby boids and steers away
+  PVector separateDisruptor (Disruptor disruptor) {
+    float desiredseparation = 150.0f;
+    PVector steer = new PVector(0, 0, 0);
+    int count = 0;
+    // For every boid in the system, check if it's too close
     
+    float d = PVector.dist(position, disruptor.position);
+    // If the distance is greater than 0 and less than an arbitrary amount (0 when you are yourself)
+    if ((d > 0) && (d < desiredseparation)) {
+      // Calculate vector pointing away from neighbor
+      PVector diff = PVector.sub(position, disruptor.position);
+      diff.normalize();
+      diff.div(d);        // Weight by distance
+      steer.add(diff);
+      count++;            // Keep track of how many
+    }
+    
+    // Average -- divide by how many+++
+    if (count > 0) {
+      steer.div((float)count);
+    }
+
+    // As long as the vector is greater than 0
+    if (steer.mag() > 0) {
+      // First two lines of code below could be condensed with new PVector setMag() method
+      // Not using this method until Processing.js catches up
+      // steer.setMag(maxspeed);
+
+      // Implement Reynolds: Steering = Desired - Velocity
+      steer.normalize();
+      steer.mult(maxspeed);
+      steer.sub(velocity);
+      steer.limit(maxforce);
+    }
+    return steer;
   }
   
 }
